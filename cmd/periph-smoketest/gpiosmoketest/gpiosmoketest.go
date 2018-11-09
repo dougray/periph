@@ -122,6 +122,9 @@ func (s *SmokeTest) Run(f *flag.FlagSet, args []string) error {
 	if err = s.testCycle(pl1, pl2); err == nil {
 		err = s.testCycle(pl2, pl1)
 	}
+	if err2 := s.testWaitForEdge(p1); err == nil {
+		err = err2
+	}
 	fmt.Printf("<terminating>\n")
 	if err2 := pl1.In(gpio.PullNoChange, gpio.NoEdge); err2 != nil {
 		fmt.Printf("(Exit) Failed to reset %s as input: %s\n", pl1, err2)
@@ -416,6 +419,7 @@ func (s *SmokeTest) testPull(p1, p2 gpio.PinIO) error {
 	return nil
 }
 
+// testCycle runs testBasic, testEdges and testPull.
 func (s *SmokeTest) testCycle(p1, p2 gpio.PinIO) error {
 	fmt.Printf("Testing %s -> %s\n", p2, p1)
 	if err := s.testBasic(p1, p2); err != nil {
@@ -432,6 +436,21 @@ func (s *SmokeTest) testCycle(p1, p2 gpio.PinIO) error {
 		}
 	}
 	return nil
+}
+
+// testWaitForEdge ensures that a pending WaitForEdge() can be canceled with
+// Halt().
+func (s *SmokeTest) testWaitForEdge(p gpio.PinIO) (err error) {
+	fmt.Printf("Testing WaitForEdge+Halt on %s\n", p)
+	time.AfterFunc(time.Second, func() {
+		if err2 := p.Halt(); err == nil {
+			err = err2
+		}
+	})
+	if p.WaitForEdge(-1) {
+		return errors.New("unexpected edge")
+	}
+	return
 }
 
 //
